@@ -41,9 +41,6 @@ contract MinimalPaymentReceiver {
     }
 
     function withdraw(address to, uint256 amount) external onlyOwner {
-        // withdraw tokens from contract to owner-controlled address
-        // We use transferFrom pattern on token; for withdrawing, will call token's transfer via low-level (assume token supports it)
-        // Caller (owner) must ensure token transfer contract supports transfer to 'to'
         (bool ok, ) = address(token).call(abi.encodeWithSignature("transfer(address,uint256)", to, amount));
         require(ok, "Withdraw failed");
         emit Withdraw(to, amount);
