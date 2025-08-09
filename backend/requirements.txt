@@ -1,1 +1,8 @@
-
+fastapi
+uvicorn[standard]
+web3==6.0.0
+sqlalchemy==1.4
+asyncpg
+psycopg2-binary
+python-dotenv
+httpx
