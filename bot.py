@@ -127,7 +127,7 @@ def decrypt_val(token: str):
 # ---------- Bot handlers ----------
 @dp.message(Command(commands=["start"]))
 async def cmd_start(message: types.Message):
-    args = message.get_args().strip() or None
+    args = (message.text or "").partition(' ')[2].strip() or None
     existing = db_fetchone("SELECT id FROM users WHERE telegram_id = ?", (message.from_user.id,))
     if not existing:
         db_execute("INSERT INTO users (telegram_id) VALUES (?)", (message.from_user.id,))
@@ -174,7 +174,7 @@ async def any_message(message: types.Message):
 @dp.message(Command(commands=["mode"]))
 async def cmd_mode(message: types.Message):
     uid = message.from_user.id
-    args = message.get_args().strip().lower()
+    args = (message.text or "").partition(' ')[2].strip().lower()
     if args not in ("test", "real", ""):
         await message.reply("Использование: /mode [test|real]\nПример: /mode test")
         return
@@ -193,7 +193,7 @@ async def cmd_setexchange(message: types.Message):
     then bot asks for api key, then secret
     """
     uid = message.from_user.id
-    args = message.get_args().strip().lower()
+    args = (message.text or "").partition(' ')[2].strip().lower()
     if args not in ("binance", "bybit"):
         await message.reply("Использование: /setexchange [binance|bybit]\nПример: /setexchange binance")
         return
@@ -270,7 +270,7 @@ async def cmd_trade(message: types.Message):
       - if 'real' -> create order via user api keys (if present)
     """
     uid = message.from_user.id
-    args = message.get_args().strip().split()
+    args = (message.text or "").partition(' ')[2].strip().split()
     if len(args) < 3:
         await message.reply("Использование: /trade SYMBOL SIDE AMOUNT\nПример: /trade BTC/USDT buy 0.001")
         return
@@ -311,7 +311,7 @@ async def cmd_trade(message: types.Message):
 @dp.message(Command(commands=["buy"]))
 async def cmd_buy(message: types.Message):
     uid = message.from_user.id
-    args = message.get_args().strip()
+    args = (message.text or "").partition(' ')[2].strip()
     if not args:
         await message.reply("Использование: /buy <amount> (например /buy 10.00)")
         return
@@ -336,7 +336,7 @@ async def cmd_confirm(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         await message.reply("Только админ.")
         return
-    args = message.get_args().strip().split()
+    args = (message.text or "").partition(' ')[2].strip().split()
     if len(args) < 2:
         await message.reply("Использование: /confirm <payment_id> <tx_hash>")
         return
@@ -404,4 +404,3 @@ if __name__ == "__main__":
         asyncio.run(dp.start_polling(bot))
     except KeyboardInterrupt:
         print("Stopped")
-
