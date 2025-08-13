@@ -1,5 +1,6 @@
 import re
-from aiogram import Bot, Dispatcher, executor, types
+import asyncio
+from aiogram import Bot, Dispatcher, types
 from dotenv import load_dotenv
 import os
 
@@ -13,15 +14,15 @@ if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN не задан в .env")
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 wallet_pattern = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 init_db()
 
-@dp.message_handler(commands=["start"])
+@dp.message(commands=["start"])
 async def start_handler(message: types.Message):
-    args = message.get_args()  # сюда приходит refcode если пользователь пришёл по ссылке https://t.me/бот?start=refcode
+    args = message.get_args()
     user = get_user_by_telegram_id(message.from_user.id)
     if user:
         await message.answer(
@@ -29,9 +30,9 @@ async def start_handler(message: types.Message):
         )
     else:
         await message.answer("Привет! Отправь, пожалуйста, адрес своего Ethereum-кошелька (начинается с 0x...)")
-        dp.current_referrer_code = args if args else None  # временно сохраняем для следующего сообщения
+        dp.current_referrer_code = args if args else None
 
-@dp.message_handler()
+@dp.message()
 async def wallet_handler(message: types.Message):
     if wallet_pattern.match(message.text):
         user = get_user_by_telegram_id(message.from_user.id)
@@ -40,7 +41,6 @@ async def wallet_handler(message: types.Message):
             return
 
         referrer_code = getattr(dp, "current_referrer_code", None)
-        # Проверим реферера — если нет в базе, сбросим в None
         if referrer_code:
             ref_user = get_user_by_referral_code(referrer_code)
             if not ref_user:
@@ -53,5 +53,8 @@ async def wallet_handler(message: types.Message):
     else:
         await message.answer("Некорректный адрес кошелька. Попробуй ещё раз.")
 
+async def main():
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    executor.start_polling(dp)
+    asyncio.run(main())
