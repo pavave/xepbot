@@ -1,8 +1,9 @@
 import re
 import asyncio
-from aiogram import Bot, Dispatcher, types
-from dotenv import load_dotenv
 import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from dotenv import load_dotenv
 
 from backend.db import init_db, add_user, get_user_by_telegram_id, get_user_by_referral_code
 from bot.referral import save_referral
@@ -20,7 +21,7 @@ wallet_pattern = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 init_db()
 
-@dp.message(commands=["start"])
+@dp.message(Command("start"))
 async def start_handler(message: types.Message):
     args = message.get_args()
     user = get_user_by_telegram_id(message.from_user.id)
