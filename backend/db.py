@@ -1,63 +1,56 @@
-# backend/db.py
 import sqlite3
-from config import DB_PATH
+from typing import Optional
+
+DB_PATH = "xepbot.sqlite"
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as con:
-        cur = con.cursor()
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            telegram_id INTEGER UNIQUE,
-            wallet TEXT,
-            ref_code TEXT UNIQUE,
-            referrer_id INTEGER,
-            accepted_terms INTEGER DEFAULT 0,
-            active INTEGER DEFAULT 0,
-            mode TEXT DEFAULT 'test',
-            exchange TEXT NULL,
-            api_key TEXT NULL,
-            api_secret TEXT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""")
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS payments (
-            id INTEGER PRIMARY KEY,
-            user_id INTEGER,
-            amount INTEGER, -- cents
-            ref TEXT,
-            status TEXT DEFAULT 'pending', -- pending | paid
-            tx_hash TEXT,
-            token_address TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            paid_on TIMESTAMP NULL
-        )""")
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS rewards (
-            id INTEGER PRIMARY KEY,
-            referrer_user_id INTEGER,
-            referred_user_id INTEGER,
-            amount INTEGER,
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )""")
-        con.commit()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE,
+        wallet_address TEXT UNIQUE,
+        referral_code TEXT UNIQUE,
+        referrer_code TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    conn.commit()
+    conn.close()
 
-def db_execute(query, params=()):
-    with sqlite3.connect(DB_PATH) as con:
-        cur = con.cursor()
-        cur.execute(query, params)
-        con.commit()
-        return cur
+def add_user(telegram_id: int, wallet_address: str, referral_code: str, referrer_code: Optional[str] = None):
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT INTO users (telegram_id, wallet_address, referral_code, referrer_code) VALUES (?, ?, ?, ?)",
+            (telegram_id, wallet_address, referral_code, referrer_code)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        # пользователь уже есть
+        pass
+    finally:
+        conn.close()
 
-def db_fetchone(query, params=()):
-    with sqlite3.connect(DB_PATH) as con:
-        cur = con.cursor()
-        cur.execute(query, params)
-        return cur.fetchone()
+def get_user_by_telegram_id(telegram_id: int) -> Optional[sqlite3.Row]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+    user = c.fetchone()
+    conn.close()
+    return user
 
-def db_fetchall(query, params=()):
-    with sqlite3.connect(DB_PATH) as con:
-        cur = con.cursor()
-        cur.execute(query, params)
-        return cur.fetchall()
+def get_user_by_referral_code(referral_code: str) -> Optional[sqlite3.Row]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE referral_code = ?", (referral_code,))
+    user = c.fetchone()
+    conn.close()
+    return user
