@@ -1,9 +1,9 @@
 import re
-import os
 import asyncio
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
 from backend.db import init_db, add_user, get_user_by_telegram_id, get_user_by_referral_code
@@ -22,69 +22,61 @@ wallet_pattern = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 init_db()
 
-# Хранение временного referrer кода в памяти (в реальном проекте надо в БД)
-temp_referrals = {}
+BOT_LINK = "https://t.me/ts4u_bot"
 
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
-    args = message.get_args()  # реферальный код из ссылки /start=refcode
-
+    args = message.get_args()
     user = get_user_by_telegram_id(message.from_user.id)
     if user:
-        # Если пользователь есть — привет и инфо
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="КУПИТЬ за 100 USDC", callback_data="buy_100_usdc")]
+        ])
         await message.answer(
             f"Привет снова!\nТвой кошелёк: {user['wallet_address']}\n"
-            f"Твоя реферальная ссылка: https://t.me/твой_бот?start={user['referral_code']}"
+            f"Твоя реферальная ссылка: {BOT_LINK}?start={user['referral_code']}",
+            reply_markup=keyboard
         )
-        # Отправим кнопку "КУПИТЬ"
-        buy_kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="КУПИТЬ за 100 USDC")]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
-        await message.answer("Выбери действие:", reply_markup=buy_kb)
-
     else:
-        # Если новый — просим адрес кошелька
-        if args:
-            temp_referrals[message.from_user.id] = args
         await message.answer("Привет! Отправь, пожалуйста, адрес своего Ethereum-кошелька (начинается с 0x...)")
+        dp.current_referrer_code = args if args else None
 
 @dp.message()
 async def wallet_handler(message: types.Message):
-    # Проверяем, что это адрес кошелька
     if wallet_pattern.match(message.text):
         user = get_user_by_telegram_id(message.from_user.id)
         if user:
             await message.answer("Ты уже зарегистрирован.")
             return
 
-        # Получаем реферальный код если есть
-        referrer_code = temp_referrals.pop(message.from_user.id, None)
+        referrer_code = getattr(dp, "current_referrer_code", None)
         if referrer_code:
             ref_user = get_user_by_referral_code(referrer_code)
             if not ref_user:
                 referrer_code = None
 
-        # Сохраняем пользователя и рефералку
         referral_code = save_referral(add_user, message.from_user.id, message.text, referrer_code)
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="КУПИТЬ за 100 USDC", callback_data="buy_100_usdc")]
+        ])
+
         await message.answer(
-            f"Адрес сохранён!\nТвоя реферальная ссылка:\nhttps://t.me/твой_бот?start={referral_code}"
+            f"Адрес сохранён!\nТвоя реферальная ссылка:\n{BOT_LINK}?start={referral_code}",
+            reply_markup=keyboard
         )
-
-        # Отправляем кнопку "КУПИТЬ"
-        buy_kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="КУПИТЬ за 100 USDC")]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        )
-        await message.answer("Выбери действие:", reply_markup=buy_kb)
-
-    elif message.text == "КУПИТЬ за 100 USDC":
-        await message.answer("Здесь пока должна быть логика оплаты через смарт-контракт. Пока в разработке.")
-
     else:
         await message.answer("Некорректный адрес кошелька. Попробуй ещё раз.")
+
+@dp.callback_query(lambda c: c.data == "buy_100_usdc")
+async def buy_usdc_callback(callback_query: types.CallbackQuery):
+    user = get_user_by_telegram_id(callback_query.from_user.id)
+    if not user:
+        await callback_query.answer("Сначала зарегистрируй кошелек через /start", show_alert=True)
+        return
+
+    # Тут можно добавить вызов функции оплаты через смарт-контракт
+    await callback_query.answer("Покупка 100 USDC (тест) инициирована!")
 
 async def main():
     await dp.start_polling(bot)
